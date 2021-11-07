@@ -45,7 +45,9 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.GregorianCalendar;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 
@@ -268,6 +270,7 @@ public class DefaultOrphanedItemStrategy extends OrphanedItemStrategy {
     @Override
     public <I extends TopLevelItem> Collection<I> orphanedItems(ComputedFolder<I> owner, Collection<I> orphaned, TaskListener listener) throws IOException, InterruptedException {
         if (abortBuilds) {
+            Queue<Run<?, ?>> abortedBuilds = new LinkedList<>();
             for (I item: orphaned) {
                 for (Job<?, ?> job: item.getAllJobs()) {
                     for (Run<?, ?> build: job.getBuilds()) {
@@ -276,7 +279,14 @@ public class DefaultOrphanedItemStrategy extends OrphanedItemStrategy {
                             continue;
                         }
                         executor.interrupt(Result.ABORTED);
+                        abortedBuilds.add(build);
                     }
+                }
+            }
+            Run<?, ?> abortedBuild;
+            while ((abortedBuild = abortedBuilds.poll()) != null) {
+                while (abortedBuild.isLogUpdated()) {
+                    Thread.sleep(100L);
                 }
             }
         }
